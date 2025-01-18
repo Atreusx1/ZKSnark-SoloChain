@@ -252,8 +252,10 @@ pub mod pallet_zksnark {
     pub struct Pallet<T>(_);
 
     #[pallet::storage]
-    #[pallet::getter(fn verifying_key)]
-    pub type VerifyingKey<T> = StorageValue<_, Vec<u8>, ValueQuery>;
+    pub(super) type Commitments<T: Config> = StorageMap<_, Blake2_128Concat, H256, ()>;
+
+    #[pallet::storage]
+    pub(super) type NullifierSet<T: Config> = StorageMap<_, Blake2_128Concat, H256, ()>;
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
@@ -266,16 +268,41 @@ pub mod pallet_zksnark {
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
         VerifyingKeyUpdated,
+        PrivateTransfer(T::AccountId, H256),
         // Add other events as needed
+    }
+
+    #[pallet::error]
+    pub enum Error<T> {
+        NullifierAlreadyUsed,
+        InvalidProof,
+        // Add other errors as needed
     }
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         #[pallet::weight(10_000)]
-        pub fn update_verifying_key(origin: OriginFor<T>, key: Vec<u8>) -> DispatchResult {
-            let _sender = ensure_signed(origin)?;
-            <VerifyingKey<T>>::put(key);
-            Self::deposit_event(Event::VerifyingKeyUpdated);
+        pub fn private_transfer(
+            origin: OriginFor<T>,
+            proof: Vec<u8>,
+            nullifier_hash: H256,
+            commitment: H256,
+            root: H256,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            
+            // Verify nullifier hasn't been spent
+            ensure!(!NullifierSet::<T>::contains_key(nullifier_hash), Error::<T>::NullifierAlreadyUsed);
+            
+            // Verify proof
+            let public_inputs = [root.as_bytes(), nullifier_hash.as_bytes(), commitment.as_bytes()].concat();
+            ensure!(Self::verify_proof(&proof, &public_inputs)?, Error::<T>::InvalidProof);
+            
+            // Update state
+            NullifierSet::<T>::insert(nullifier_hash, ());
+            Commitments::<T>::insert(commitment, ());
+            
+            Self::deposit_event(Event::PrivateTransfer(who, commitment));
             Ok(())
         }
 
@@ -298,15 +325,14 @@ pub mod pallet_zksnark {
 // ------------------------
 
 #[pallet::genesis_config]
-pub struct BuildGenesisConfig<T: Config> {
+pub struct GenesisConfig<T: Config> {
     pub verifying_key: Vec<u8>,
 }
 
-impl<T: Config> Default for BuildGenesisConfig<T> {
+impl<T: Config> Default for GenesisConfig<T> {
     fn default() -> Self {
         GenesisConfig {
             verifying_key: Vec::new(),
         }
     }
 }
-
