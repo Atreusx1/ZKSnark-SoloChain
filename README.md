@@ -1,226 +1,191 @@
-# Substrate Node Template
+# Enhanced zkSNARK-based Transaction System
 
-A fresh [Substrate](https://substrate.io/) node, ready for hacking :rocket:
+## Introduction
 
-A standalone version of this template is available for each release of Polkadot
-in the [Substrate Developer Hub Parachain
-Template](https://github.com/substrate-developer-hub/substrate-node-template/)
-repository. The parachain template is generated directly at each Polkadot
-release branch from the [Solochain Template in
-Substrate](https://github.com/paritytech/polkadot-sdk/tree/master/templates/solochain)
-upstream
+This project aims to create a zkSNARK-based private transaction system built using the Substrate framework. By leveraging Circom for designing cryptographic circuits and integrating them into a custom Substrate runtime pallet (`pallet-zksnark`), the system enables secure and private on-chain verification of zero-knowledge proofs.
 
-It is usually best to use the stand-alone version to start a new project. All
-bugs, suggestions, and feature requests should be made upstream in the
-[Substrate](https://github.com/paritytech/polkadot-sdk/tree/master/substrate)
-repository.
 
-## Getting Started
 
-Depending on your operating system and Rust version, there might be additional
-packages required to compile this template. Check the
-[Install](https://docs.substrate.io/install/) instructions for your platform for
-the most common dependencies. Alternatively, you can use one of the [alternative
-installation](#alternatives-installations) options.
+## Features
 
-### Build
+- **Enhanced Privacy:** Zero-knowledge proofs ensure sensitive transaction details (sender, receiver, amount) remain confidential while verifying their validity.
+- **Scalable Verification:** The use of zkSNARKs allows efficient and scalable on-chain proof verification, reducing computational overhead for validators.
+- **Customizable Circuits:** Circom circuits allow modular designs for a variety of use cases, including single transactions, batch transactions, and Merkle tree validation.
+- **On-Chain Integration:** The project integrates zkSNARK verification logic directly into the Substrate runtime.
 
-Use the following command to build the node without launching it:
+## Components
 
-```sh
-cargo build --release
+1. **Circom Circuits**  
+   Circom is used to define cryptographic circuits. Two major circuits are included:  
+   - `EnhancedTransaction.circom`: Handles private transaction inputs, including sender, receiver, and amount, and enforces constraints such as valid range checks and hash-based commitments.  
+   - `MerkleTree.circom`: Verifies membership in a Merkle tree to ensure the transaction is part of a valid dataset.  
+
+2. **Proof System**  
+   The `snarkjs` tool is used to generate proofs and verification keys.  
+   - The `.r1cs` file contains the circuit's constraints.  
+   - The `.zkey` file is used for generating zkSNARK proofs.  
+   - The `verification_key.json` is used for on-chain proof verification.  
+
+3. **Substrate Pallet**  
+   The custom `pallet-zksnark` handles the logic for verifying zkSNARK proofs. It includes:  
+   - Storage for the verification key.  
+   - Functions for proof submission and verification.  
+   - Events to log the success or failure of proof verification.  
+
+4. **Workflow Automation**  
+   A `build.rs` script automates the process of compiling circuits and integrating their outputs into the Substrate runtime. This ensures seamless updates when the circuits are modified.
+---
+# Architectural Diagram
+![image](https://github.com/user-attachments/assets/d8fc28d9-3b6e-49be-85df-091ae73c98cd)
+---
+
+## Workflow
+
+### Step 1: Circuit Design in Circom
+
+Circuits are designed in `.circom` files to define the cryptographic logic. Here's a snippet of the `EnhancedTransaction` circuit:
 ```
+circom
+template EnhancedTransaction() {
+    signal private input sender;
+    signal private input receiver;
+    signal private input amount;
+    signal output commitment;
 
-### Embedded Docs
+    // Poseidon Hash for the commitment
+    signal intermediate_hash;
+    intermediate_hash <== Poseidon([sender, receiver, amount]);
 
-After you build the project, you can use the following command to explore its
-parameters and subcommands:
+    // Range checks for valid inputs
+    sender >= 0;
+    receiver >= 0;
+    amount >= 0;
 
-```sh
-./target/release/solochain-template-node -h
+    commitment <== intermediate_hash;
+}
 ```
-
-You can generate and view the [Rust
-Docs](https://doc.rust-lang.org/cargo/commands/cargo-doc.html) for this template
-with this command:
-
-```sh
-cargo +nightly doc --open
 ```
-
-### Single-Node Development Chain
-
-The following command starts a single-node development chain that doesn't
-persist state:
-
-```sh
-./target/release/solochain-template-node --dev
+This circuit:
+Accepts sender, receiver, and amount as private inputs.
+Computes a Poseidon hash as the commitment.
 ```
+Ensures all inputs are non-negative using range constraints.
+### Step 2: Circuit Compilation
+The circuits are compiled using the circom tool to generate .r1cs, .wasm, and .zkey files. These outputs are essential for generating and verifying zkSNARK proofs.
 
-To purge the development chain's state, run the following command:
+Commands:
 
-```sh
-./target/release/solochain-template-node purge-chain --dev
+bash
+
+``` circom enhanced_transaction.circom --r1cs --wasm --sym ```
+
+``` snarkjs groth16 setup enhanced_transaction.r1cs pot12_final.ptau circuit_final.zkey ```
+
+```snarkjs zkey export verificationkey circuit_final.zkey verification_key.json```
+
+### Step 3: Proof Generation
+Proofs are generated using the .wasm file and the .zkey proving key. This step can be performed off-chain by users.
+
+Example proof generation:
 ```
+javascript
 
-To start the development chain with detailed logging, run the following command:
+const { generateProof } = require("snarkjs");
 
-```sh
-RUST_BACKTRACE=1 ./target/release/solochain-template-node -ldebug --dev
+const input = {
+  sender: 123,
+  receiver: 456,
+  amount: 789,
+};
+
+generateProof(input, "enhanced_transaction.wasm", "circuit_final.zkey"); 
 ```
+### Step 4: Substrate Runtime Integration
+The pallet-zksnark integrates the zkSNARK verification logic into the Substrate runtime. The runtime uses the verification_key.json to verify proofs on-chain.
 
-Development chains:
-
-- Maintain state in a `tmp` folder while the node is running.
-- Use the **Alice** and **Bob** accounts as default validator authorities.
-- Use the **Alice** account as the default `sudo` account.
-- Are preconfigured with a genesis state (`/node/src/chain_spec.rs`) that
-  includes several pre-funded development accounts.
-
-
-To persist chain state between runs, specify a base path by running a command
-similar to the following:
-
-```sh
-// Create a folder to use as the db base path
-$ mkdir my-chain-state
-
-// Use of that folder to store the chain state
-$ ./target/release/solochain-template-node --dev --base-path ./my-chain-state/
-
-// Check the folder structure created inside the base path after running the chain
-$ ls ./my-chain-state
-chains
-$ ls ./my-chain-state/chains/
-dev
-$ ls ./my-chain-state/chains/dev
-db keystore network
+Key Rust snippet:
 ```
+rust
+#[pallet::call]
+fn submit_proof(
+    origin: OriginFor<T>,
+    proof: Vec<u8>,
+    public_inputs: Vec<u8>,
+) -> DispatchResult {
+    let sender = ensure_signed(origin)?;
 
-### Connect with Polkadot-JS Apps Front-End
+    // Verify the proof using the on-chain verification key
+    ensure!(
+        Self::verify_proof(proof, public_inputs),
+        Error::<T>::InvalidProof
+    );
 
-After you start the node template locally, you can interact with it using the
-hosted version of the [Polkadot/Substrate
-Portal](https://polkadot.js.org/apps/#/explorer?rpc=ws://localhost:9944)
-front-end by connecting to the local node endpoint. A hosted version is also
-available on [IPFS](https://dotapps.io/). You can
-also find the source code and instructions for hosting your own instance in the
-[`polkadot-js/apps`](https://github.com/polkadot-js/apps) repository.
-
-### Multi-Node Local Testnet
-
-If you want to see the multi-node consensus algorithm in action, see [Simulate a
-network](https://docs.substrate.io/tutorials/build-a-blockchain/simulate-network/).
-
-## Template Structure
-
-A Substrate project such as this consists of a number of components that are
-spread across a few directories.
-
-### Node
-
-A blockchain node is an application that allows users to participate in a
-blockchain network. Substrate-based blockchain nodes expose a number of
-capabilities:
-
-- Networking: Substrate nodes use the [`libp2p`](https://libp2p.io/) networking
-  stack to allow the nodes in the network to communicate with one another.
-- Consensus: Blockchains must have a way to come to
-  [consensus](https://docs.substrate.io/fundamentals/consensus/) on the state of
-  the network. Substrate makes it possible to supply custom consensus engines
-  and also ships with several consensus mechanisms that have been built on top
-  of [Web3 Foundation
-  research](https://research.web3.foundation/Polkadot/protocols/NPoS).
-- RPC Server: A remote procedure call (RPC) server is used to interact with
-  Substrate nodes.
-
-There are several files in the `node` directory. Take special note of the
-following:
-
-- [`chain_spec.rs`](./node/src/chain_spec.rs): A [chain
-  specification](https://docs.substrate.io/build/chain-spec/) is a source code
-  file that defines a Substrate chain's initial (genesis) state. Chain
-  specifications are useful for development and testing, and critical when
-  architecting the launch of a production chain. Take note of the
-  `development_config` and `testnet_genesis` functions. These functions are
-  used to define the genesis state for the local development chain
-  configuration. These functions identify some [well-known
-  accounts](https://docs.substrate.io/reference/command-line-tools/subkey/) and
-  use them to configure the blockchain's initial state.
-- [`service.rs`](./node/src/service.rs): This file defines the node
-  implementation. Take note of the libraries that this file imports and the
-  names of the functions it invokes. In particular, there are references to
-  consensus-related topics, such as the [block finalization and
-  forks](https://docs.substrate.io/fundamentals/consensus/#finalization-and-forks)
-  and other [consensus
-  mechanisms](https://docs.substrate.io/fundamentals/consensus/#default-consensus-models)
-  such as Aura for block authoring and GRANDPA for finality.
+    // Emit an event if verification succeeds
+    Self::deposit_event(Event::ProofVerified { sender });
+    Ok(())
+```
+### Step 5: On-Chain Verification
+When a user submits a proof, the Substrate runtime validates it using the pallet-zksnark. Verified proofs ensure that all transaction constraints are satisfied without revealing private data.
 
 
-### Runtime
+# Drawbacks
 
-In Substrate, the terms "runtime" and "state transition function" are analogous.
-Both terms refer to the core logic of the blockchain that is responsible for
-validating blocks and executing the state changes they define. The Substrate
-project in this repository uses
-[FRAME](https://docs.substrate.io/learn/runtime-development/#frame) to construct
-a blockchain runtime. FRAME allows runtime developers to declare domain-specific
-logic in modules called "pallets". At the heart of FRAME is a helpful [macro
-language](https://docs.substrate.io/reference/frame-macros/) that makes it easy
-to create pallets and flexibly compose them to create blockchains that can
-address [a variety of needs](https://substrate.io/ecosystem/projects/).
+**Trusted Setup Dependency:** zkSNARKs require a trusted setup, which introduces a potential risk if the setup phase is compromised.
 
-Review the [FRAME runtime implementation](./runtime/src/lib.rs) included in this
-template and note the following:
+**High Computational Costs:** Proof generation and on-chain verification can be computationally expensive.
 
-- This file configures several pallets to include in the runtime. Each pallet
-  configuration is defined by a code block that begins with `impl
-  $PALLET_NAME::Config for Runtime`.
-- The pallets are composed into a single runtime by way of the
-  [`construct_runtime!`](https://paritytech.github.io/substrate/master/frame_support/macro.construct_runtime.html)
-  macro, which is part of the [core FRAME pallet
-  library](https://docs.substrate.io/reference/frame-pallets/#system-pallets).
+**Storage Overhead:** Verifying keys and large proofs may require significant storage space.
 
-### Pallets
+**Limited Scalability:** While zkSNARKs reduce transaction data, verifying multiple proofs in a single block could strain resources.
 
-The runtime in this project is constructed using many FRAME pallets that ship
-with [the Substrate
-repository](https://github.com/paritytech/polkadot-sdk/tree/master/substrate/frame) and a
-template pallet that is [defined in the
-`pallets`](./pallets/template/src/lib.rs) directory.
+**Complex Development Process:** Circuit design, compilation, and integration demand specialized knowledge.
 
-A FRAME pallet is comprised of a number of blockchain primitives, including:
+## Acknowledgements
 
-- Storage: FRAME defines a rich set of powerful [storage
-  abstractions](https://docs.substrate.io/build/runtime-storage/) that makes it
-  easy to use Substrate's efficient key-value database to manage the evolving
-  state of a blockchain.
-- Dispatchables: FRAME pallets define special types of functions that can be
-  invoked (dispatched) from outside of the runtime in order to update its state.
-- Events: Substrate uses
-  [events](https://docs.substrate.io/build/events-and-errors/) to notify users
-  of significant state changes.
-- Errors: When a dispatchable fails, it returns an error.
+This project was made possible with the support and contributions of several tools, libraries, and resources. Special thanks to:
 
-Each pallet has its own `Config` trait which serves as a configuration interface
-to generically define the types and parameters it depends on.
+- **[Circom](https://docs.circom.io/):** For providing a powerful tool to define and compile zkSNARK circuits.
+- **[SnarkJS](https://github.com/iden3/snarkjs):** For enabling proof generation and verification workflows.
+- **[Substrate Framework](https://substrate.dev):** For its robust blockchain development framework and modular architecture.
+- **[Arkworks](https://arkworks.rs/):** For cryptographic libraries used in Rust-based zkSNARK integrations.
+- **[Poseidon Hash](https://eprint.iacr.org/2019/458):** For the efficient hash function used in the cryptographic circuit design.
+- **Polkadot and Phala Network Documentation:** For inspiration in privacy-focused blockchain development.
+- Open-source contributors, researchers, and the blockchain community for their ongoing efforts to innovate in the field of zero-knowledge and privacy technologies.
 
-## Alternatives Installations
+---
 
-Instead of installing dependencies and building this source directly, consider
-the following alternatives.
+## Roadmap
 
-### Nix
+Here’s a high-level roadmap to outline future development plans for this project:
 
-Install [nix](https://nixos.org/) and
-[nix-direnv](https://github.com/nix-community/nix-direnv) for a fully
-plug-and-play experience for setting up the development environment. To get all
-the correct dependencies, activate direnv `direnv allow`.
+### Phase 1: Core Features (✅ Almost Completed)
+- Design and implement zkSNARK circuits for private transactions.
+- Integrate Circom-generated outputs into a Substrate-based blockchain runtime.
+- Implement proof verification logic in `pallet-zksnark`.
+- Automate circuit compilation and deployment workflows using `build.rs`.
 
-### Docker
+### Phase 2: Advanced Features (🔄 In Progress)
+- Add support for Merkle tree-based proof validation to enhance transaction scalability.
+- Implement batch transaction support in Circom circuits to reduce proof generation overhead.
+- Integrate advanced range proofs to handle more complex constraints.
 
-Please follow the [Substrate Docker instructions
-here](https://github.com/paritytech/polkadot-sdk/blob/master/substrate/docker/README.md) to
-build the Docker container with the Substrate Node Template binary.
-# untraceable-solochain
-# untraceable-solochain
+### Phase 3: Developer Tools (🔜 Upcoming)
+- Create a user-friendly CLI tool for automating proof generation and submission.
+- Build a React-based front-end for submitting private transactions to the blockchain.
+- Develop detailed documentation and examples to help developers integrate this solution.
+
+### Phase 4: Optimization and Testing (🔜 Upcoming)
+- Optimize circuit designs to minimize proof size and generation time.
+- Conduct stress testing and benchmarking on large-scale datasets.
+- Explore support for Groth16 alternatives, such as PLONK, to reduce trusted setup dependency.
+
+### Phase 5: Community Adoption (🚀 Future Goals)
+- Open-source the project and encourage community contributions.
+- Conduct developer workshops and create video tutorials for onboarding.
+- Deploy a live testnet to allow users to experiment with the system.
+- Explore cross-chain interoperability with Ethereum and Polkadot ecosystems.
+
+---
+
+### Contribute to the Roadmap
+We welcome suggestions and contributions from the community to improve and expand this project. Feel free to open an issue or submit a pull request to share your ideas.
