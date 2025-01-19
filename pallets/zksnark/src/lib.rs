@@ -92,42 +92,46 @@ impl<T: Config> ZkSnarkVerifier for Pallet<T> {
         public_inputs: &[u8],
         vk_bytes: &[u8]
     ) -> Result<bool, DispatchError> {
-        // Read the proof points from the binary format
+        // Decode proof components
         let a_points = Self::decode_g1_point(pi_a)
             .map_err(|_| Error::<T>::InvalidProof)?;
-            
         let b_points = Self::decode_g2_point(pi_b)
             .map_err(|_| Error::<T>::InvalidProof)?;
-            
         let c_points = Self::decode_g1_point(pi_c)
             .map_err(|_| Error::<T>::InvalidProof)?;
-
+    
         // Parse the verification key
         let vk = Self::parse_verification_key(vk_bytes)
             .map_err(|_| Error::<T>::InvalidProof)?;
-
+    
+        // Prepare the verification key
+        let prepared_vk = ark_groth16::prepare_verifying_key(&vk);
+    
         // Convert public inputs to field elements
         let mut inputs = Vec::new();
         for chunk in public_inputs.chunks(32) {
             let mut bytes = [0u8; 32];
             bytes.copy_from_slice(chunk);
-            inputs.push(Fp256::from_be_bytes_mod_order(&bytes));
+            inputs.push(Fr::from_be_bytes_mod_order(&bytes));
         }
-
-        // Verify the proof using arkworks Groth16 verify
-        use ark_groth16::prepare_verifying_key;
-        use frame_support::traits::base16::verify_proof;
-        let pvk = prepare_verifying_key(&vk);
-        let verified = Self::verify_proof(
-            &pvk,
-            &a_points,
-            &b_points,
-            &c_points,
-            &inputs
+    
+        // Create the proof structure
+        let proof = ark_groth16::Proof {
+            a: a_points,
+            b: b_points,
+            c: c_points,
+        };
+    
+        // Verify the proof using the prepared verifying key
+        let verified = ark_groth16::Groth16::<Bls12_381>::verify_with_processed_vk(
+            &prepared_vk,
+            &inputs,
+            &proof,
         ).map_err(|_| Error::<T>::ProofVerificationFailed)?;
-
+    
         Ok(verified)
     }
+    
 
     // Helper function to decode a G1 point from bytes
     fn decode_g1_point(bytes: &[u8]) -> Result<G1Affine, &'static str> {
