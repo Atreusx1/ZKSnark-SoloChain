@@ -17,12 +17,14 @@ sp-runtime = { version = "40.0.0", default-features = false }
 sp-std = { version = "14.0.0", default-features = false }
 
 # Cryptographic dependencies
-ark-ff = { version = "0.5.0", default-features = false }
-ark-ec = { version = "0.5.0", default-features = false }
 ark-bls12-381 = { version = "0.5.0", default-features = false }
+ark-ec = { version = "0.5.0", default-features = false }
+ark-ff = { version = "0.5.0", default-features = false }
+ark-std = { version = "0.5.0", default-features = false }
+ark-serialize = { version = "0.5.0", default-features = false }
 ark-groth16 = { version = "0.5.0", default-features = false }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
-serde_json = { version = "1.0.135", default-features = false, features = ["alloc"] }
+serde_json = { version = "1.0.136", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
 sp-core = { version = "35.0.0" }
@@ -41,9 +43,11 @@ std = [
     "sp-io/std",
     "sp-runtime/std",
     "sp-std/std",
-    "ark-ff/std",
-    "ark-ec/std",
     "ark-bls12-381/std",
+    "ark-ec/std",
+    "ark-ff/std",
+    "ark-std/std",
+    "ark-serialize/std",
     "ark-groth16/std",
     "serde_json/std",
     "hex/std",
