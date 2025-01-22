@@ -159,10 +159,12 @@ This project was made possible with the support and contributions of several too
 Here’s a high-level roadmap to outline future development plans for this project:
 
 ### Phase 1: Core Features (✅ Almost Completed)
-- Design and implement zkSNARK circuits for private transactions.
-- Integrate Circom-generated outputs into a Substrate-based blockchain runtime.
-- Implement proof verification logic in `pallet-zksnark`.
-- Automate circuit compilation and deployment workflows using `build.rs`.
+- Design and implement zkSNARK circuits for private transactions.✅ 
+- Integrate Circom-generated outputs into a Substrate-based blockchain runtime.✅ 
+- Implement proof verification logic in `pallet-zksnark`.✅ 
+- Translating entire circuits in Halo2 to make it trustless (pending)⚠️
+- Automate circuit compilation and deployment workflows using `build.rs`.(pending)⚠️
+  
 
 ### Phase 2: Advanced Features (🔄 In Progress)
 - Add support for Merkle tree-based proof validation to enhance transaction scalability.
