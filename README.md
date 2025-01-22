@@ -168,7 +168,7 @@ Here’s a high-level roadmap to outline future development plans for this proje
 
 ### Phase 2: Advanced Features (🔄 In Progress)
 - Add support for Merkle tree-based proof validation to enhance transaction scalability.
-- Implement batch transaction support in Circom circuits to reduce proof generation overhead.
+- Implement batch transaction support in Halo2 circuits to reduce proof generation overhead.
 - Integrate advanced range proofs to handle more complex constraints.
 
 ### Phase 3: Developer Tools (🔜 Upcoming)
@@ -179,7 +179,7 @@ Here’s a high-level roadmap to outline future development plans for this proje
 ### Phase 4: Optimization and Testing (🔜 Upcoming)
 - Optimize circuit designs to minimize proof size and generation time.
 - Conduct stress testing and benchmarking on large-scale datasets.
-- Explore support for Groth16 alternatives, such as PLONK, to reduce trusted setup dependency.
+
 
 ### Phase 5: Community Adoption (🚀 Future Goals)
 - Open-source the project and encourage community contributions.
