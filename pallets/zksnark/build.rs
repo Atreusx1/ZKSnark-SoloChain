@@ -1,62 +1,63 @@
-    use std::process::Command;
-    use std::path::Path;
-    use std::env;
+use halo2_proofs::{
+    plonk::{VerificationKey, Circuit, keygen_vk},
+    circuit::{Layouter, SimpleFloorPlanner},
+    pasta::pallas::Base,
+};
+use pasta_curves::{pallas, vesta};
+use serde::{Serialize};
+use serde_json;
+use std::fs;
 
-    fn main() {
-        println!("cargo:rerun-if-changed=src/circuits");
+#[derive(Serialize)]
+struct VerifyingKeyWrapper {
+    alpha_g1: pallas::Affine,
+    beta_g2: vesta::Affine,
+    gamma_g2: vesta::Affine,
+    delta_g2: vesta::Affine,
+    ic: Vec<pallas::Affine>,
+}
 
-        let out_dir = env::var("OUT_DIR").unwrap();
-        let build_dir = Path::new(&out_dir).join("zksnark");
-        std::fs::create_dir_all(&build_dir).unwrap();
+impl From<VerificationKey<Base>> for VerifyingKeyWrapper {
+    fn from(vk: VerificationKey<Base>) -> Self {
+        VerifyingKeyWrapper {
+            alpha_g1: vk.alpha_g1,
+            beta_g2: vk.beta_g2,
+            gamma_g2: vk.gamma_g2,
+            delta_g2: vk.delta_g2,
+            ic: vk.ic,
+        }
+    }
+}
 
-        #[cfg(feature = "std")]
-        compile_circuits(&build_dir);
+struct BuildTransactionCircuit;
+
+impl Circuit<Base> for BuildTransactionCircuit {
+    type Config = ();
+    type FloorPlanner = SimpleFloorPlanner;
+
+    fn without_witnesses(&self) -> Self {
+        Self
     }
 
-    #[cfg(feature = "std")]
-    fn compile_circuits(build_dir: &Path) {
-        // Compile circuit
-        let status = Command::new("circom")
-            .args(&[
-                "src/circuits/enhanced_transaction.circom",
-                "--r1cs",
-                "--wasm",
-                "--sym",
-                "--c",
-                &format!("--output={}", build_dir.display()),
-            ])
-            .status()
-            .expect("Failed to compile circuit");
-
-        assert!(status.success(), "Circuit compilation failed");
-
-        // Setup proving system
-        let pot_file_path = format!("{}/src/circuits/pot16_final.ptau", env::current_dir().unwrap().display());
-
-        let status = Command::new("snarkjs")
-            .args(&[
-                "groth16",
-                "setup",
-                &format!("{}/enhanced_transaction.r1cs", build_dir.display()),
-                &pot_file_path, // Correctly using the absolute path to pot16_final.ptau
-                &format!("{}/circuit_final.zkey", build_dir.display()),
-            ])
-            .status()
-            .expect("Failed to setup proving system");
-
-        assert!(status.success(), "Proving system setup failed");
-
-        // Export verification key
-        let status = Command::new("snarkjs")
-            .args(&[
-                "zkey",
-                "export",
-                "verificationkey",
-                &format!("{}/circuit_final.zkey", build_dir.display()),
-                &format!("{}/verification_key.json", build_dir.display()),
-            ])
-            .status()
-            .expect("Failed to export verification key");
-
-        assert!(status.success(), "Verification key export failed");
+    fn configure(_meta: &mut halo2_proofs::plonk::ConstraintSystem<Base>) -> Self::Config {
+        ()
     }
+
+    fn synthesize(
+        &self,
+        _config: Self::Config,
+        _layouter: impl Layouter<Base>,
+    ) -> Result<(), halo2_proofs::plonk::Error> {
+        Ok(())
+    }
+}
+
+fn main() {
+    let circuit = BuildTransactionCircuit;
+    let params = halo2_proofs::poly::commitment::Params::new(9);
+    let vk = keygen_vk(&params, &circuit).unwrap();
+
+    let vk_wrapper: VerifyingKeyWrapper = vk.into();
+    let verification_key_json = serde_json::to_vec(&vk_wrapper).unwrap();
+    fs::write("src/verification_key.json", verification_key_json).unwrap();
+}
