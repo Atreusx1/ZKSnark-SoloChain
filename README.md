@@ -162,7 +162,7 @@ Here’s a high-level roadmap to outline future development plans for this proje
 - Design and implement zkSNARK circuits for private transactions.✅ 
 - Integrate Circom-generated outputs into a Substrate-based blockchain runtime.✅ 
 - Implement proof verification logic in `pallet-zksnark`.✅ 
-- Translating entire circuits in Halo2 to make it trustless (pending)⚠️
+- Translating entire circuits in Halo2 to make it trustless (in progress)⚠️
 - Automate circuit compilation and deployment workflows using `build.rs`.(pending)⚠️
   
 
