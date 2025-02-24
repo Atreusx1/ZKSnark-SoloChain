@@ -22,9 +22,11 @@ halo2_poseidon = { version = "0.1.0", default-features = false }
 
 # Serialization
 hex = { version = "0.4.3", default-features = true, features = ["alloc"] }
-halo2_proofs = { version = "0.3.0", features = ["std", "serde"] }
-pasta_curves = { version = "0.5.1", features = ["serde"] }
-serde_json = "1.0.138"
+halo2_proofs = { version = "0.3.0"}
+pasta_curves = "0.5.0"
+serde = { version = "1.0"}
+serde_json = "1.0"
+base64 = "0.22.1"
 
 [dev-dependencies]
 sp-core = { version = "35.0.0", default-features = true }
@@ -34,10 +36,10 @@ tempdir = "0.3.7"
 
 [build-dependencies]
 halo2_proofs = { version = "0.3.0", default-features = true }
-serde_json = "1.0.138"
-pasta_curves = { version = "0.5.1", features = ["serde"] }
-serde = "1.0.138"
-
+serde_json = { version = "1.0", default-features = true }
+pasta_curves = { version = "0.5.1", default-features = true }
+serde = { version = "1.0.138" , default-features = true }
+base64 = { version = "0.22.1", default-features = true }
 [features]
 default = ["std"]
 std = [

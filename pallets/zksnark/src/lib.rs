@@ -8,6 +8,16 @@ use serde_json;
 mod circuits;
 mod merkle;
 
+// Add this to the top of your lib.rs
+#[derive(Serialize)]
+pub struct VerifyingKeyWrapper { 
+    pub alpha_g1: pallas::Affine, 
+    pub beta_g2: vesta::Affine, 
+    pub gamma_g2: vesta::Affine, 
+    pub delta_g2: vesta::Affine, 
+    pub ic: Vec<pallas::Affine>, 
+}
+
 #[cfg_attr(feature = "std", derive(Debug))]
 #[derive(Encode, Decode, Default, PartialEq, Clone, RuntimeDebug, TypeInfo)]
 pub struct ZkProof {
@@ -21,10 +31,9 @@ pub mod pallet {
     use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
 
-    #[pallet::pallet]
-    #[pallet::generate_store(pub(super) trait Store)]
-    #[pallet::without_storage_info]
-    pub struct Pallet<T>(_);
+#[pallet::pallet]
+#[pallet::generate_store(pub(super) trait Store)]
+pub struct Pallet<T>(_);
 
     #[pallet::config]
     pub trait Config: frame_system::Config {}
@@ -48,8 +57,7 @@ pub mod pallet {
         ProofVerificationFailed,
         InvalidProof,
     }
-}
-use frame_support::pallet_prelude::*;
+}use frame_support::pallet_prelude::*;
 use frame_system::pallet_prelude::*;
 
 impl<T: Config> Pallet<T> {

@@ -1,37 +1,16 @@
 use halo2_proofs::{
-    plonk::{VerificationKey, Circuit, keygen_vk},
     circuit::{Layouter, SimpleFloorPlanner},
-    pasta::pallas::Base,
+    plonk::{keygen_vk, VerifyingKey},
+    poly::commitment::Params,
+    pasta::pallas,
 };
-use pasta_curves::{pallas, vesta};
-use serde::{Serialize};
-use serde_json;
 use std::fs;
-
-#[derive(Serialize)]
-struct VerifyingKeyWrapper {
-    alpha_g1: pallas::Affine,
-    beta_g2: vesta::Affine,
-    gamma_g2: vesta::Affine,
-    delta_g2: vesta::Affine,
-    ic: Vec<pallas::Affine>,
-}
-
-impl From<VerificationKey<Base>> for VerifyingKeyWrapper {
-    fn from(vk: VerificationKey<Base>) -> Self {
-        VerifyingKeyWrapper {
-            alpha_g1: vk.alpha_g1,
-            beta_g2: vk.beta_g2,
-            gamma_g2: vk.gamma_g2,
-            delta_g2: vk.delta_g2,
-            ic: vk.ic,
-        }
-    }
-}
+use base64::engine::general_purpose;
+use serde_json;
 
 struct BuildTransactionCircuit;
 
-impl Circuit<Base> for BuildTransactionCircuit {
+impl halo2_proofs::plonk::Circuit<pallas::Base> for BuildTransactionCircuit {
     type Config = ();
     type FloorPlanner = SimpleFloorPlanner;
 
@@ -39,14 +18,14 @@ impl Circuit<Base> for BuildTransactionCircuit {
         Self
     }
 
-    fn configure(_meta: &mut halo2_proofs::plonk::ConstraintSystem<Base>) -> Self::Config {
+    fn configure(_meta: &mut halo2_proofs::plonk::ConstraintSystem<pallas::Base>) -> Self::Config {
         ()
     }
 
     fn synthesize(
         &self,
         _config: Self::Config,
-        _layouter: impl Layouter<Base>,
+        _layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), halo2_proofs::plonk::Error> {
         Ok(())
     }
@@ -54,10 +33,21 @@ impl Circuit<Base> for BuildTransactionCircuit {
 
 fn main() {
     let circuit = BuildTransactionCircuit;
-    let params = halo2_proofs::poly::commitment::Params::new(9);
-    let vk = keygen_vk(&params, &circuit).unwrap();
+    let params: Params<pallas::Affine> = Params::new(9);
+    let vk = keygen_vk(&params, &circuit).expect("Keygen VK failed");
 
-    let vk_wrapper: VerifyingKeyWrapper = vk.into();
-    let verification_key_json = serde_json::to_vec(&vk_wrapper).unwrap();
-    fs::write("src/verification_key.json", verification_key_json).unwrap();
+    // Serialize the verification key to bytes
+    let mut vk_bytes = Vec::new();
+    vk.write(&mut vk_bytes).expect("Failed to serialize VK");
+
+    // Save the binary data to a file
+    fs::write("src/verification_key.bin", vk_bytes).expect("Write verification key failed");
+
+    // Encode the binary data as Base64 and save it in a JSON file
+    let verification_key_base64 = general_purpose::STANDARD.encode(vk_bytes);
+    let verification_key_json = serde_json::json!({
+        "vk": verification_key_base64
+    });
+    fs::write("src/verification_key.json", verification_key_json.to_string())
+        .expect("Write verification key JSON failed");
 }
